@@ -112,6 +112,7 @@
     <bundle>mvn:pentaho/pentaho-big-data-kettle-plugins-kafka/${project.version}</bundle>
     <bundle>mvn:pentaho/pentaho-big-data-kettle-plugins-formats-meta/${project.version}</bundle>
     <bundle>mvn:pentaho/pentaho-big-data-kettle-plugins-formats/${project.version}</bundle>
+    <bundle>mvn:pentaho/hadoop-cluster-plugin/${project.version}</bundle>
   </feature>
 
   <feature name="shims-list" description="Shims bundles list" version="1.0">
