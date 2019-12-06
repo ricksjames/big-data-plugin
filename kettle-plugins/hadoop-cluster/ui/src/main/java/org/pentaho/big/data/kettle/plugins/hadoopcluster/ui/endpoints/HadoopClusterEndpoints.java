@@ -22,6 +22,11 @@
 
 package org.pentaho.big.data.kettle.plugins.hadoopcluster.ui.endpoints;
 
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileItemFactory;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.json.simple.JSONObject;
 import org.pentaho.big.data.kettle.plugins.hadoopcluster.ui.dialog.HadoopClusterDialog;
 import org.pentaho.big.data.kettle.plugins.hadoopcluster.ui.model.ThinNameClusterModel;
@@ -32,14 +37,18 @@ import org.pentaho.osgi.metastore.locator.api.MetastoreLocator;
 import org.pentaho.hadoop.shim.api.cluster.NamedClusterService;
 import org.pentaho.runtime.test.RuntimeTester;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
 
 import org.pentaho.di.ui.util.HelpUtils;
@@ -53,6 +62,22 @@ public class HadoopClusterEndpoints {
   private final RuntimeTester runtimeTester;
   private final String internalShim;
   private final boolean secureEnabled;
+
+  private enum FILE_TYPE {
+    SITE( "site" ),
+    DRIVER( ".kar" ),
+    KEYTAB( ".keytab" );
+
+    private String val;
+
+    FILE_TYPE( String val ) {
+      this.val = val;
+    }
+
+    public String getValue() {
+      return this.val;
+    }
+  }
 
   public static final String
     HELP_URL =
@@ -73,6 +98,43 @@ public class HadoopClusterEndpoints {
       internalShim );
   }
 
+  private List<FileItem> parseRequest( HttpServletRequest request, FILE_TYPE fileType ) {
+    List<FileItem> files = new ArrayList<>();
+    if ( ServletFileUpload.isMultipartContent( request ) ) {
+      try {
+        FileItemFactory factory = new DiskFileItemFactory();
+        ServletFileUpload fileUpload = new ServletFileUpload( factory );
+        List<FileItem> fileItems = fileUpload.parseRequest( request );
+        for ( FileItem fileItem : fileItems ) {
+          validateUpload( fileItem, fileType, files );
+        }
+      } catch ( FileUploadException e ) {
+        files = new ArrayList<>();
+      }
+    }
+    return files;
+  }
+
+  private void validateUpload( FileItem fileItem, FILE_TYPE fileType, List<FileItem> files ) {
+    switch ( fileType ) {
+      case SITE:
+        if ( getClusterManager().isValidSiteFile( fileItem ) ) {
+          files.add( fileItem );
+        }
+        break;
+      case DRIVER:
+        if ( fileItem.getName().endsWith( FILE_TYPE.DRIVER.getValue() ) ) {
+          files.add( fileItem );
+        }
+        break;
+      case KEYTAB:
+        if ( fileItem.getName().endsWith( FILE_TYPE.KEYTAB.getValue() ) ) {
+          files.add( fileItem );
+        }
+        break;
+    }
+  }
+
   @GET @Path( "/help" ) public Response help() {
     spoonSupplier.get().getShell().getDisplay().asyncExec( () -> HelpUtils
       .openHelpDialog( spoonSupplier.get().getDisplay().getActiveShell(),
@@ -82,30 +144,41 @@ public class HadoopClusterEndpoints {
   }
 
   //http://localhost:9051/cxf/hadoop-cluster/importNamedCluster
-  @POST @Path( "/importNamedCluster" ) @Produces( { MediaType.APPLICATION_JSON } ) public Response importNamedCluster(
-    ThinNameClusterModel model ) {
-    JSONObject response = getClusterManager().importNamedCluster( model );
+  @POST
+  @Consumes( { MediaType.APPLICATION_JSON, MediaType.MULTIPART_FORM_DATA } )
+  @Path( "/importNamedCluster" ) @Produces( { MediaType.APPLICATION_JSON } ) public Response importNamedCluster(
+    ThinNameClusterModel model, @Context HttpServletRequest request ) {
+    List<FileItem> siteFilesSource = parseRequest( request, FILE_TYPE.SITE );
+    JSONObject response = getClusterManager().importNamedCluster( model, siteFilesSource );
     return Response.ok( response ).build();
   }
 
   //http://localhost:9051/cxf/hadoop-cluster/createNamedCluster
-  @POST @Path( "/createNamedCluster" ) @Consumes( { MediaType.APPLICATION_JSON } )
-  @Produces( { MediaType.APPLICATION_JSON } ) public Response createNamedCluster( ThinNameClusterModel model ) {
-    JSONObject response = getClusterManager().createNamedCluster( model );
+  @POST
+  @Path( "/createNamedCluster" ) @Consumes( { MediaType.APPLICATION_JSON, MediaType.MULTIPART_FORM_DATA } )
+  @Produces( { MediaType.APPLICATION_JSON } )
+  public Response createNamedCluster( ThinNameClusterModel model, @Context HttpServletRequest request ) {
+    List<FileItem> siteFilesSource = parseRequest( request, FILE_TYPE.SITE );
+    JSONObject response = getClusterManager().createNamedCluster( model, siteFilesSource );
     return Response.ok( response ).build();
   }
 
   //http://localhost:9051/cxf/hadoop-cluster/editNamedCluster
-  @POST @Path( "/editNamedCluster" ) @Consumes( { MediaType.APPLICATION_JSON } )
-  @Produces( { MediaType.APPLICATION_JSON } ) public Response editNamedCluster( ThinNameClusterModel model ) {
-    JSONObject response = getClusterManager().editNamedCluster( model, true );
+  @POST @Path( "/editNamedCluster" ) @Consumes( { MediaType.APPLICATION_JSON, MediaType.MULTIPART_FORM_DATA } )
+  @Produces( { MediaType.APPLICATION_JSON } ) public Response editNamedCluster( ThinNameClusterModel model,
+                                                                                @Context HttpServletRequest request ) {
+    List<FileItem> siteFilesSource = parseRequest( request, FILE_TYPE.SITE );
+    JSONObject response = getClusterManager().editNamedCluster( model, true, siteFilesSource );
     return Response.ok( response ).build();
   }
 
   //http://localhost:9051/cxf/hadoop-cluster/duplicateNamedCluster
-  @POST @Path( "/duplicateNamedCluster" ) @Consumes( { MediaType.APPLICATION_JSON } )
-  @Produces( { MediaType.APPLICATION_JSON } ) public Response duplicateNamedCluster( ThinNameClusterModel model ) {
-    JSONObject response = getClusterManager().editNamedCluster( model, false );
+  @POST @Path( "/duplicateNamedCluster" ) @Consumes( { MediaType.APPLICATION_JSON, MediaType.MULTIPART_FORM_DATA } )
+  @Produces( { MediaType.APPLICATION_JSON } ) public Response duplicateNamedCluster( ThinNameClusterModel model,
+                                                                                     @Context
+                                                                                       HttpServletRequest request ) {
+    List<FileItem> siteFilesSource = parseRequest( request, FILE_TYPE.SITE );
+    JSONObject response = getClusterManager().editNamedCluster( model, false, siteFilesSource );
     return Response.ok( response ).build();
   }
 
@@ -127,16 +200,17 @@ public class HadoopClusterEndpoints {
     return Response.ok( getClusterManager().runTests( runtimeTester, namedCluster ) ).build();
   }
 
-  //http://localhost:9051/cxf/hadoop-cluster/installDriver?source=
-  @SuppressWarnings( "javasecurity:S2083" )
-  @GET @Path( "/installDriver" ) @Produces( { MediaType.APPLICATION_JSON } ) public Response installDriver(
-    /*This is a desktop application. Path injection is not a concern : @SuppressWarnings( "javasecurity:S2083" )*/
-    @QueryParam( "source" ) String source ) {
-    return Response.ok( getClusterManager().installDriver( source ) ).build();
+  //http://localhost:9051/cxf/hadoop-cluster/installDriver
+  @POST @Path( "/installDriver" ) @Produces( { MediaType.APPLICATION_JSON, MediaType.MULTIPART_FORM_DATA } )
+  public Response installDriver(
+    @Context
+      HttpServletRequest request ) {
+    List<FileItem> driver = parseRequest( request, FILE_TYPE.DRIVER );
+    return Response.ok( getClusterManager().installDriver( driver ) ).build();
   }
+
   //http://localhost:9051/cxf/hadoop-cluster/getSecure
   @GET @Path( "/getSecure" ) @Produces( { MediaType.APPLICATION_JSON } ) public Response getSecure() {
     return Response.ok( "{\"secureEnabled\":\"" + Boolean.toString( this.secureEnabled ) + "\"}" ).build();
   }
-
 }

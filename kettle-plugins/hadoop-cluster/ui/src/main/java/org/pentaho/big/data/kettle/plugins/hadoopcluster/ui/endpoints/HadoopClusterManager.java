@@ -23,8 +23,10 @@
 package org.pentaho.big.data.kettle.plugins.hadoopcluster.ui.endpoints;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.FileUtils;
 import org.json.simple.JSONObject;
 import org.pentaho.big.data.kettle.plugins.hadoopcluster.ui.dialog.HadoopClusterDialog;
@@ -67,9 +69,7 @@ import javax.xml.xpath.XPathFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -177,21 +177,12 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     this.internalShim = internalShim;
   }
 
-  private File decodeSiteFilesSource( String source ) throws UnsupportedEncodingException {
-    if ( !StringUtil.isEmpty( source ) ) {
-      source = URLDecoder.decode( source, "UTF-8" );
-      return new File( source );
-    }
-    return new File( "" );
-  }
-
-  public JSONObject importNamedCluster( ThinNameClusterModel model ) {
+  public JSONObject importNamedCluster( ThinNameClusterModel model, List<FileItem> siteFilesSource ) {
     JSONObject response = new JSONObject();
     response.put( NAMED_CLUSTER, "" );
     try {
+      // Create and initialize template.
       NamedCluster nc = namedClusterService.getClusterTemplate();
-
-      // Initialize the template with empty values.
       nc.setHdfsHost( "" );
       nc.setHdfsPort( "" );
       nc.setJobTrackerHost( "" );
@@ -199,7 +190,6 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
       nc.setZooKeeperHost( "" );
       nc.setZooKeeperPort( "" );
       nc.setOozieUrl( "" );
-
       nc.setName( model.getName() );
       nc.setHdfsUsername( model.getHdfsUsername() );
       nc.setHdfsPassword( model.getHdfsPassword() );
@@ -209,21 +199,17 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
         nc.initializeVariablesFrom( null );
       }
 
-      File siteFilesSource = decodeSiteFilesSource( model.getImportPath() );
-      if ( siteFilesSource.exists() ) {
-        boolean
-          isConfigurationSet =
-          configureNamedCluster( siteFilesSource, nc, model.getShimVendor(), model.getShimVersion() );
-        if ( isConfigurationSet ) {
-          deleteNamedClusterSchemaOnly( model );
-          setupKnoxSecurity( nc, model );
-          namedClusterService.create( nc, metaStore );
-          deleteConfigFolder( nc.getName() );
-          installSiteFiles( siteFilesSource, nc );
-          createConfigProperties( nc );
-          setupKerberosSecurity( model );
-          response.put( NAMED_CLUSTER, nc.getName() );
-        }
+      boolean isConfigurationSet =
+        configureNamedCluster( siteFilesSource, nc, model.getShimVendor(), model.getShimVersion() );
+      if ( isConfigurationSet ) {
+        deleteNamedClusterSchemaOnly( model );
+        setupKnoxSecurity( nc, model );
+        namedClusterService.create( nc, metaStore );
+        deleteConfigFolder( nc.getName() );
+        installSiteFiles( siteFilesSource, nc );
+        createConfigProperties( nc );
+        setupKerberosSecurity( model );
+        response.put( NAMED_CLUSTER, nc.getName() );
       }
     } catch ( Exception e ) {
       logChannel.error( e.getMessage() );
@@ -278,16 +264,13 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     }
   }
 
-  public JSONObject createNamedCluster( ThinNameClusterModel model ) {
+  public JSONObject createNamedCluster( ThinNameClusterModel model, List<FileItem> siteFilesSource ) {
     JSONObject response = new JSONObject();
     response.put( NAMED_CLUSTER, "" );
     try {
       NamedCluster nc = createXMLSchema( model );
       deleteConfigFolder( nc.getName() );
-      File siteFilesSource = decodeSiteFilesSource( model.getImportPath() );
-      if ( siteFilesSource.exists() ) {
-        installSiteFiles( siteFilesSource, nc );
-      }
+      installSiteFiles( siteFilesSource, nc );
       createConfigProperties( nc );
       setupKerberosSecurity( model );
       response.put( NAMED_CLUSTER, nc.getName() );
@@ -297,7 +280,7 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     return response;
   }
 
-  public JSONObject editNamedCluster( ThinNameClusterModel model, boolean isEditMode ) {
+  public JSONObject editNamedCluster( ThinNameClusterModel model, boolean isEditMode, List<FileItem> siteFilesSource ) {
     JSONObject response = new JSONObject();
     response.put( NAMED_CLUSTER, "" );
     try {
@@ -321,11 +304,7 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
         }
       }
 
-      // If source provided, install site files in the new config folder deleting all existing.
-      File siteFilesSource = decodeSiteFilesSource( model.getImportPath() );
-      if ( siteFilesSource.exists() ) {
-        installSiteFiles( siteFilesSource, nc );
-      }
+      installSiteFiles( siteFilesSource, nc );
 
       // If the user changed the shim, create a new config.properties file that corresponds to that shim
       // in the new config folder.
@@ -383,18 +362,19 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     return model;
   }
 
-  private boolean configureNamedCluster( File importPath, NamedCluster nc, String shimVendor, String shimVersion ) {
+  private boolean configureNamedCluster( List<FileItem> siteFilesSource, NamedCluster nc, String shimVendor,
+                                         String shimVersion ) {
     resolveShimIdentifier( nc, shimVendor, shimVersion );
 
     String oozieBaseUrl = "oozie.base.url";
     Map<String, String> properties = new HashMap();
-    extractProperties( importPath, "core-site.xml", properties, new String[] { "fs.defaultFS" } );
-    extractProperties( importPath, "yarn-site.xml", properties, new String[] { "yarn.resourcemanager.address" } );
-    extractProperties( importPath, "hive-site.xml", properties,
+    extractProperties( siteFilesSource, "core-site.xml", properties, new String[] { "fs.defaultFS" } );
+    extractProperties( siteFilesSource, "yarn-site.xml", properties, new String[] { "yarn.resourcemanager.address" } );
+    extractProperties( siteFilesSource, "hive-site.xml", properties,
       new String[] { "hive.zookeeper.quorum", "hive.zookeeper.client.port" } );
-    extractProperties( importPath, "oozie-site.xml", properties, new String[] { oozieBaseUrl } );
+    extractProperties( siteFilesSource, "oozie-site.xml", properties, new String[] { oozieBaseUrl } );
     if ( properties.get( oozieBaseUrl ) == null ) {
-      extractProperties( importPath, "oozie-default.xml", properties, new String[] { oozieBaseUrl } );
+      extractProperties( siteFilesSource, "oozie-default.xml", properties, new String[] { oozieBaseUrl } );
     }
 
     boolean isConfigurationSet = false;
@@ -480,10 +460,15 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     }
   }
 
-  private void extractProperties( File importPath, String fileName, Map<String, String> properties, String[] keys ) {
-    File siteFile = new File( importPath, fileName );
-    if ( siteFile.exists() ) {
-      Document document = parseSiteFileDocument( new File( importPath, fileName ) );
+  private void extractProperties( List<FileItem> siteFilesSource, String fileName, Map<String, String> properties,
+                                  String[] keys ) {
+    FileItem siteFile = (FileItem) CollectionUtils.find( siteFilesSource, ( Object object ) -> {
+      FileItem fileItem = (FileItem) object;
+      return fileItem.getName().equals( fileName );
+    } );
+
+    if ( siteFile != null ) {
+      Document document = parseSiteFileDocument( siteFile );
       if ( document != null ) {
         XPathFactory xpathFactory = XPathFactory.newInstance();
         XPath xpath = xpathFactory.newXPath();
@@ -503,12 +488,13 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     }
   }
 
-  @SuppressWarnings( "javasecurity:S2083" )
-  public JSONObject installDriver( String source ) {
+  public JSONObject installDriver( List<FileItem> driver ) {
     boolean success = true;
     try {
       String destination = System.getProperties().getProperty( Const.SHIM_DRIVER_DEPLOYMENT_LOCATION, "./drivers" );
-      FileUtils.copyFileToDirectory( new File( source ), new File( destination ) );
+      FileItem driverFile = driver.get( 0 );
+      FileUtils.copyInputStreamToFile( driverFile.getInputStream(),
+        new File( destination + fileSeparator + driverFile.getName() ) );
     } catch ( IOException e ) {
       success = false;
       logChannel.error( e.getMessage() );
@@ -518,26 +504,30 @@ public class HadoopClusterManager implements RuntimeTestProgressCallback {
     return response;
   }
 
-  private void installSiteFiles( File source, NamedCluster nc ) throws IOException {
-    if ( source.isDirectory() ) {
-      File destination = new File( getNamedClusterConfigsRootDir() + fileSeparator + nc.getName() );
-      File[] files = source.listFiles();
-      for ( File file : files ) {
-        if ( ( file.getName().endsWith( "-site.xml" ) || file.getName().endsWith( "-default.xml" ) || file.getName()
-          .equals( CONFIG_PROPERTIES ) ) && parseSiteFileDocument( file ) != null ) {
-          FileUtils.copyFileToDirectory( file, destination );
-        }
+  private void installSiteFiles( List<FileItem> siteFilesSource, NamedCluster nc ) throws IOException {
+    for ( FileItem sitefile : siteFilesSource ) {
+      if ( isValidSiteFile( sitefile ) && parseSiteFileDocument( sitefile ) != null ) {
+        File destination = new File(
+          getNamedClusterConfigsRootDir() + fileSeparator + nc.getName() + fileSeparator + sitefile.getName() );
+        FileUtils.copyInputStreamToFile( sitefile.getInputStream(), destination );
       }
     }
   }
 
-  private Document parseSiteFileDocument( File file ) {
+  public boolean isValidSiteFile( FileItem fileItem ) {
+    return fileItem.getName() != null && ( fileItem.getName().endsWith( "-site.xml" ) || fileItem.getName()
+      .endsWith( "-default.xml" ) || fileItem.getName().equals( CONFIG_PROPERTIES ) )
+      && fileItem.getContentType() != null;
+  }
+
+  private Document parseSiteFileDocument( FileItem file ) {
     Document document = null;
     try {
-      document = XMLHandler.loadXMLFile( file );
+      document = XMLHandler.loadXMLFile( file.getInputStream() );
     } catch ( KettleXMLException e ) {
       logChannel.warn( String.format( "Site file %s is not a well formed XML document", file.getName() ) );
-
+    } catch ( IOException e ) {
+      logChannel.error( e.getMessage() );
     }
     return document;
   }

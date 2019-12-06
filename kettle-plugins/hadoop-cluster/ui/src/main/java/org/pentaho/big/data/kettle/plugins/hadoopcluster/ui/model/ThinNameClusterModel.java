@@ -36,7 +36,6 @@ public class ThinNameClusterModel {
   private String zooKeeperPort;
   private String oozieUrl;
   private String kafkaBootstrapServers;
-  private String importPath;
   private String oldName;
   private String securityType;
   private String kerberosSubType;
@@ -152,14 +151,6 @@ public class ThinNameClusterModel {
 
   public void setOozieUrl( String oozieUrl ) {
     this.oozieUrl = oozieUrl;
-  }
-
-  public String getImportPath() {
-    return importPath;
-  }
-
-  public void setImportPath( String importPath ) {
-    this.importPath = importPath;
   }
 
   public String getOldName() {

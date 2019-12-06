@@ -25,6 +25,8 @@ package org.pentaho.big.data.kettle.plugins.hadoopcluster.ui.endpoints;
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FileUtils;
 import org.json.simple.JSONObject;
 import org.junit.After;
@@ -45,6 +47,7 @@ import org.pentaho.runtime.test.RuntimeTestStatus;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -103,10 +106,9 @@ public class HadoopClusterManagerTest {
   @Test public void testSecuredImportNamedCluster() {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    model.setImportPath( "src/test/resources/secured" );
     model.setShimVendor( "Cloudera" );
     model.setShimVersion( "5.14" );
-    JSONObject result = hadoopClusterManager.importNamedCluster( model );
+    JSONObject result = hadoopClusterManager.importNamedCluster( model, getFiles( "src/test/resources/secured" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
     assertTrue( new File( getShimTestDir(), "core-site.xml" ).exists() );
     assertTrue( new File( getShimTestDir(), "yarn-site.xml" ).exists() );
@@ -116,10 +118,10 @@ public class HadoopClusterManagerTest {
   @Test public void testUnsecuredImportNamedCluster() {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    model.setImportPath( "src/test/resources/unsecured" );
     model.setShimVendor( "Cloudera" );
     model.setShimVersion( "5.14" );
-    JSONObject result = hadoopClusterManager.importNamedCluster( model );
+    JSONObject result =
+      hadoopClusterManager.importNamedCluster( model, getFiles( "src/test/resources/unsecured" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
     assertTrue( new File( getShimTestDir(), "core-site.xml" ).exists() );
     assertTrue( new File( getShimTestDir(), "yarn-site.xml" ).exists() );
@@ -130,10 +132,10 @@ public class HadoopClusterManagerTest {
   @Test public void testMissingInfoImportNamedCluster() {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    model.setImportPath( "src/test/resources/missing-info" );
     model.setShimVendor( "Cloudera" );
     model.setShimVersion( "5.14" );
-    JSONObject result = hadoopClusterManager.importNamedCluster( model );
+    JSONObject result =
+      hadoopClusterManager.importNamedCluster( model, getFiles( "src/test/resources/missing-info" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
     assertTrue( new File( getShimTestDir(), "core-site.xml" ).exists() );
     assertTrue( new File( getShimTestDir(), "yarn-site.xml" ).exists() );
@@ -148,18 +150,18 @@ public class HadoopClusterManagerTest {
   @Test public void testCreateNamedCluster() {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    JSONObject result = hadoopClusterManager.createNamedCluster( model );
+    JSONObject result = hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
   }
 
   @Test public void testOverwriteNamedClusterCaseInsensitive() {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( "NCTESTName" );
-    hadoopClusterManager.createNamedCluster( model );
+    hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
 
     model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    JSONObject result = hadoopClusterManager.createNamedCluster( model );
+    JSONObject result = hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
 
     String
@@ -173,17 +175,16 @@ public class HadoopClusterManagerTest {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
     model.setOldName( ncTestName );
-    JSONObject result = hadoopClusterManager.editNamedCluster( model, true );
+    JSONObject result = hadoopClusterManager.editNamedCluster( model, true, getFiles( "/" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
   }
 
   @Test public void testFailNamedCluster() {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    model.setImportPath( "src/test/resources/bad" );
     model.setShimVendor( "Claudera" );
     model.setShimVersion( "5.14" );
-    JSONObject result = hadoopClusterManager.importNamedCluster( model );
+    JSONObject result = hadoopClusterManager.importNamedCluster( model, getFiles( "src/test/resources/bad" ) );
     assertEquals( "", result.get( "namedCluster" ) );
   }
 
@@ -197,7 +198,8 @@ public class HadoopClusterManagerTest {
   @Test public void testInstallDriver() {
     System.getProperties()
       .setProperty( Const.SHIM_DRIVER_DEPLOYMENT_LOCATION, "src/test/resources/driver-destination" );
-    JSONObject response = hadoopClusterManager.installDriver( "src/test/resources/driver-source/driver.kar" );
+    JSONObject response =
+      hadoopClusterManager.installDriver( getFiles( "src/test/resources/driver-source" ) );
     boolean isSuccess = (boolean) response.get( "installed" );
     if ( isSuccess ) {
       File driver = new File( "src/test/resources/driver-destination/driver.kar" );
@@ -242,7 +244,7 @@ public class HadoopClusterManagerTest {
     model.setGatewayUsername( "username" );
     model.setGatewayUrl( "http://localhost:8008" );
     model.setGatewayPassword( "password" );
-    hadoopClusterManager.createNamedCluster( model );
+    hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
 
     NamedCluster namedCluster = namedClusterService.getNamedClusterByName( knoxNC, metaStore );
     assertEquals( true, namedCluster.isUseGateway() );
@@ -261,7 +263,7 @@ public class HadoopClusterManagerTest {
     model.setKerberosImpersonationUsername( "impersonationusername" );
     model.setKerberosImpersonationPassword( "impersonationpassword" );
 
-    hadoopClusterManager.createNamedCluster( model );
+    hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
 
     String configFile = System.getProperty( "user.home" ) + File.separator + ".pentaho" + File.separator + "metastore"
       + File.separator + "pentaho" + File.separator + "NamedCluster" + File.separator + "Configs" + File.separator
@@ -293,7 +295,7 @@ public class HadoopClusterManagerTest {
     model.setKeytabAuthenticationLocation( "authenticationlocation" );
     model.setKeytabImpersonationLocation( "impersonationlocation" );
 
-    hadoopClusterManager.createNamedCluster( model );
+    hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
 
     String configFile = System.getProperty( "user.home" ) + File.separator + ".pentaho" + File.separator + "metastore"
       + File.separator + "pentaho" + File.separator + "NamedCluster" + File.separator + "Configs" + File.separator
@@ -316,10 +318,21 @@ public class HadoopClusterManagerTest {
   @Test public void testGetNamedCluster() throws ConfigurationException {
     ThinNameClusterModel model = new ThinNameClusterModel();
     model.setName( ncTestName );
-    JSONObject result = hadoopClusterManager.createNamedCluster( model );
+    JSONObject result = hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
     assertEquals( ncTestName, result.get( "namedCluster" ) );
     ThinNameClusterModel nc = hadoopClusterManager.getNamedCluster( "NCTEST" );
     assertEquals( "ncTest", nc.getName() );
+  }
+
+  @Test
+  public void testValidSiteFile() {
+    assertFalse( hadoopClusterManager
+      .isValidSiteFile(
+        new DiskFileItem( "file", "application/octet-stream", false, "bad-site-file.exe", 10240, null ) ) );
+    assertTrue( hadoopClusterManager
+      .isValidSiteFile( new DiskFileItem( "file", "text/xml", false, "core-site.xml", 10240, null ) ) );
+    assertTrue( hadoopClusterManager
+      .isValidSiteFile( new DiskFileItem( "file", "text/xml", false, "config.properties", 10240, null ) ) );
   }
 
   @Test
@@ -339,7 +352,7 @@ public class HadoopClusterManagerTest {
     model.setKerberosImpersonationUsername( "impersonationusername" );
     model.setKerberosImpersonationPassword( "impersonationpassword" );
 
-    hadoopClusterManager.createNamedCluster( model );
+    hadoopClusterManager.createNamedCluster( model, getFiles( "/" ) );
 
     String configFile = System.getProperty( "user.home" ) + File.separator + ".pentaho" + File.separator + "metastore"
       + File.separator + "pentaho" + File.separator + "NamedCluster" + File.separator + "Configs" + File.separator
@@ -362,6 +375,8 @@ public class HadoopClusterManagerTest {
   @After public void tearDown() throws IOException {
     FileUtils.deleteDirectory( getShimTestDir() );
     FileUtils.deleteDirectory( new File( "src/test/resources/driver-destination" ) );
+    FileUtils
+      .deleteDirectory( new File( hadoopClusterManager.getNamedClusterConfigsRootDir() + File.separator + knoxNC ) );
   }
 
   private File getShimTestDir() {
@@ -370,5 +385,21 @@ public class HadoopClusterManagerTest {
       System.getProperty( "user.home" ) + File.separator + ".pentaho" + File.separator + "metastore" + File.separator
         + "pentaho" + File.separator + "NamedCluster" + File.separator + "Configs" + File.separator + ncTestName;
     return new File( shimTestDir );
+  }
+
+  private List<FileItem> getFiles( String siteFilesLocation ) {
+    List<FileItem> diskFileItems = new ArrayList<>();
+    try {
+      File siteFilesDirectory = new File( siteFilesLocation );
+      File[] siteFiles = siteFilesDirectory.listFiles();
+      for ( File siteFile : siteFiles ) {
+        DiskFileItem diskFileItem = new DiskFileItem( "file", "text/xml", false, siteFile.getName(), 10240, null );
+        FileUtils.copyFile( siteFile, diskFileItem.getOutputStream() );
+        diskFileItems.add( diskFileItem );
+      }
+    } catch ( IOException e ) {
+      diskFileItems = new ArrayList<>();
+    }
+    return diskFileItems;
   }
 }
