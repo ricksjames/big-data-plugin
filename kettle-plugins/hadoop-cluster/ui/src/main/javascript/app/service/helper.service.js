@@ -77,6 +77,66 @@ define(
        * Wraps the http angular service to provide sensible defaults
        *
        * @param {String} url - the url
+       * @param {String} data - the post data
+       * @return {Promise} - a promise to be resolved as soon as we get confirmation from the server.
+       * @private
+       */
+      function httpPost1(url, data) {
+        // var options = {
+        //   method: "POST",
+        //   url: url,
+        //   headers: {
+        //     Accept: "application/json"
+        //   }
+        // };
+        // if (data !== null) {
+        //   options.data = data;
+        // }
+        // return $http(options);
+
+
+        var fd = new FormData();
+        for (var i = 0; i < data.siteFiles.length; i++) {
+          fd.append("siteFiles[" + i + "]", data.siteFiles[i]);
+        }
+        return $http.post(url, fd, {
+          transformRequest: angular.identity,
+          headers: {'Content-Type': "multipart/form-data"},
+          data: data.model
+        })
+        .success(function(){
+          console.log("Success httpPost1 ");
+        })
+        .error(function(){
+          console.log("Error httpPost1 ");
+        });
+
+
+        // return $http.post({
+        //   url:url,
+        //   method: "POST",
+        //   headers: {'Content-Type': "multipart/form-data"},
+        //   transformRequest: function (data) {
+        //     var fd = new FormData();
+        //
+        //     for (var i = 0; i < data.siteFiles.length; i++) {
+        //       fd.append("siteFiles[" + i + "]", data.siteFiles[i]);
+        //     }
+        //   },
+        //   data: { data: data.model, siteFiles:data.siteFiles }
+        // })
+        // .success(function(){
+        //   console.log("Success httpPost1 ");
+        // })
+        // .error(function(){
+        //   console.log("Error httpPost1 ");
+        // });
+      }
+
+      /**
+       * Wraps the http angular service to provide sensible defaults
+       *
+       * @param {String} url - the url
        * @param {String} data - the put data
        * @return {Promise} - a promise to be resolved as soon as we get confirmation from the server.
        * @private

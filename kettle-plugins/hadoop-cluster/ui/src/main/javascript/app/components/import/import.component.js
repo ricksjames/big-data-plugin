@@ -37,13 +37,13 @@ define([
     vm.onSelectShim = onSelectShim;
     vm.onSelectShimVersion = onSelectShimVersion;
     vm.getShimVersions = getShimVersions;
+    vm.onFilesChange = onFilesChange;
 
     var modalDialogElement = angular.element("#modalDialog");
     var modalOverlayElement = angular.element("#modalOverlay");
 
     function onInit() {
       vm.data = $stateParams.data ? $stateParams.data : {};
-      vm.browseType = "folder";
       vm.header = i18n.get('import.header');
       vm.clusterNameLabel = i18n.get('hadoop.cluster.name.label');
       vm.importFolderLabel = i18n.get('import.folder.label');
@@ -73,7 +73,6 @@ define([
           vm.data = {
             model: {
               name: "",
-              importPath: "",
               shimVendor: "",
               shimVersion: "",
               hdfsUsername: "",
@@ -119,6 +118,10 @@ define([
 
     function onSelectShimVersion(option) {
       vm.data.model.shimVersion = option;
+    }
+
+    function onFilesChange(files){
+      console.log(files);
     }
 
     function checkDuplicateName(name) {
@@ -169,7 +172,7 @@ define([
           label: i18n.get('controls.next.label'),
           class: "primary",
           isDisabled: function () {
-            return !vm.data.model || !vm.data.model.name || !vm.data.model.importPath;
+            return !vm.data.model || !vm.data.model.name || !vm.data.siteFiles;
           },
           position: "right",
           onClick: next

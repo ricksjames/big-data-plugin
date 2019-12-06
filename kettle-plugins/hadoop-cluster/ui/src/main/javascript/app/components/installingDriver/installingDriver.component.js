@@ -40,7 +40,7 @@ define([
       vm.almostDone = i18n.get('progress.almostdone');
       vm.message = i18n.get('installing.driver.message');
       $timeout(function () {
-        dataService.installDriver(vm.data.driverPath).then(
+        dataService.installDriver(vm.data.driverFile).then(
           function (res) {
               vm.data = res.data;
               $state.go("driver-status", {data: vm.data});

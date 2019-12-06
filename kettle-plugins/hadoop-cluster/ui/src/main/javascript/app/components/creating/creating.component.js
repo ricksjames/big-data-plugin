@@ -42,7 +42,22 @@ define([
       $timeout(function () {
 
         var cluster = vm.data.model;
-        cluster.importPath = encodeURIComponent(cluster.importPath);
+
+        //TODO: handle the FormData/Multipart call to the server
+        //This variable contains the site files.
+        // vm.data.siteFiles
+
+        //Possibly part of the solution...
+        // var f = document.getElementById('file').files[0],
+        //   r = new FileReader();
+        //
+        // r.onloadend = function(e) {
+        //   var data = e.target.result;
+        //   //send your binary data via $http or $resource or do anything else with it
+        // }
+        //
+        // r.readAsArrayBuffer(f);
+
         var process;
 
         switch (vm.data.type) {

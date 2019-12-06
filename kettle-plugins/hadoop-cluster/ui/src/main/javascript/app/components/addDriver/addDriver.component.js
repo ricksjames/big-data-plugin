@@ -38,7 +38,6 @@ define([
 
         setDialogTitle(i18n.get('hadoop.cluster.title'));
 
-        vm.browseType = "file";
         vm.header = i18n.get('add.driver.header');
         vm.driverInstructionsLabel = i18n.get('add.driver.instructions.label');
         vm.driverSupportMatrixLinkText = i18n.get('add.driver.support.matrix.line.text');
@@ -46,7 +45,7 @@ define([
 
         vm.data = {
           type: "driver",
-          driverPath: ""
+          driverFile: {}
         };
 
         vm.buttons = getButtons();
@@ -66,7 +65,7 @@ define([
             label: i18n.get('controls.next.label'),
             class: "primary",
             isDisabled: function () {
-              return !vm.data.driverPath;
+              return !vm.data.driverFile;
             },
             position: "right",
             onClick: function () {

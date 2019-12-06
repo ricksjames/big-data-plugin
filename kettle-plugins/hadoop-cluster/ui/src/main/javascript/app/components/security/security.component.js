@@ -112,8 +112,8 @@ define([
       vm.data.model.kerberosAuthenticationPassword = "";
       vm.data.model.kerberosImpersonationUsername = "";
       vm.data.model.kerberosImpersonationPassword = "";
-      vm.data.model.keytabAuthenticationLocation = "";
-      vm.data.model.keytabImpersonationLocation = "";
+      vm.data.keytabAuthenticationFile = "";
+      vm.data.keytabImpersonationFile = {};
     }
 
     function clearKnoxValues() {

@@ -120,6 +120,13 @@ define([], function () {
         data: null,
         transition: null
       }
+    }).state('browse', {
+      url: "/browse",
+      template: "<browse></browse>",
+      params: {
+        data: null,
+        transition: null
+      }
     });
     $urlRouterProvider.otherwise("/import");
   }

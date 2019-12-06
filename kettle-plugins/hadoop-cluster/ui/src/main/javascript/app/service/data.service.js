@@ -74,7 +74,7 @@ define(
       }
 
       function importNamedCluster(data) {
-        return helperService.httpPost([baseUrl, "importNamedCluster"].join("/"), data);
+        return helperService.httpPost1([baseUrl, "importNamedCluster"].join("/"), data);
       }
 
       function getNamedCluster(name) {

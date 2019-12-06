@@ -54,7 +54,6 @@ define([
       vm.impersonateUserLabel = i18n.get('kerberos.impersonate.username.label');
       vm.impersonatePasswordLabel = i18n.get('kerberos.impersonate.password.label');
 
-      vm.keytabBrowseType = "file";
       vm.keytabAuthPathLabel = i18n.get('kerberos.keytab.auth.path.label');
       vm.keytabImpersonatePathLabel = i18n.get('kerberos.keytab.impersonate.path.label');
 
@@ -76,7 +75,7 @@ define([
           class: "primary",
           isDisabled: function () {
             if (vm.data.model.kerberosSubType === vm.kerberosSubTypes.KEYTAB) {
-              return !vm.data.model.keytabAuthenticationLocation;
+              return !vm.data.keytabAuthenticationFile;
             } else {
               return (vm.data.model.kerberosAuthenticationUsername && !vm.data.model.kerberosAuthenticationPassword) ||
                 (!vm.data.model.kerberosAuthenticationUsername && vm.data.model.kerberosAuthenticationPassword) ||
@@ -119,8 +118,8 @@ define([
     }
 
     function clearKerberosKeytabValues() {
-      vm.data.model.keytabAuthenticationLocation = "";
-      vm.data.model.keytabImpersonationLocation = "";
+      vm.data.keytabAuthenticationFile = {};
+      vm.data.keytabImpersonationFile = {};
     }
 
   }
